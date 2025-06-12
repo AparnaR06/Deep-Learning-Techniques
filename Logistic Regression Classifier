@@ -1,0 +1,99 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report
+
+# -------------------------------
+# Logistic Regression Model Class
+# -------------------------------
+
+class LogisticRegressionModel:
+    def __init__(self, learning_rate=0.01, num_iterations=1000):
+        self.learning_rate = learning_rate
+        self.num_iterations = num_iterations
+        self.weights = None
+        self.bias = None
+
+    def _sigmoid(self, z):
+        return 1 / (1 + np.exp(-z))
+
+    def fit(self, X, y):
+        n_samples, n_features = X.shape
+        self.weights = np.zeros(n_features)
+        self.bias = 0
+
+        for iteration in range(self.num_iterations):
+            linear_model = np.dot(X, self.weights) + self.bias
+            y_predicted = self._sigmoid(linear_model)
+
+            cost = -np.mean(
+                y * np.log(y_predicted + 1e-8) +
+                (1 - y) * np.log(1 - y_predicted + 1e-8)
+            )
+
+            dw = (1 / n_samples) * np.dot(X.T, (y_predicted - y))
+            db = (1 / n_samples) * np.sum(y_predicted - y)
+
+            self.weights -= self.learning_rate * dw
+            self.bias -= self.learning_rate * db
+
+            if (iteration + 1) % 100 == 0:
+                print(f"Iteration {iteration + 1}/{self.num_iterations}, Cost: {cost:.4f}")
+
+    def predict(self, X):
+        linear_model = np.dot(X, self.weights) + self.bias
+        y_predicted = self._sigmoid(linear_model)
+        return np.array([1 if i > 0.5 else 0 for i in y_predicted])
+
+# -------------------------------
+# Load and Preprocess Dataset
+# -------------------------------
+
+# Load CSV from URL or use a local path if needed
+url = 'https://gist.githubusercontent.com/RaunakDune/4381ef89d4dc3c66459b1fd80bae254d/raw/Videogame_Sales_2016_Processed.csv'
+df = pd.read_csv(url)
+
+# Drop rows with missing values in important columns
+df = df.dropna(subset=['Global_Sales', 'Year_of_Release'])
+
+# Create target variable: 1 if Global_Sales > 1.0 million, else 0
+df['High_Seller'] = df['Global_Sales'].apply(lambda x: 1 if x > 1.0 else 0)
+
+# Encode categorical variables as numbers
+df['Genre'] = pd.factorize(df['Genre'])[0]
+df['Publisher'] = pd.factorize(df['Publisher'])[0]
+df['Developer'] = pd.factorize(df['Developer'])[0]
+df['Rating'] = pd.factorize(df['Rating'])[0]
+
+# Select features and target
+X = df[['Year_of_Release', 'Genre', 'Publisher', 'Developer', 'Rating']]
+y = df['High_Seller']
+
+# Normalize features
+X = (X - X.mean()) / X.std()
+
+# Split into training and test sets
+X_train, X_test, y_train, y_test = train_test_split(X.values, y.values, test_size=0.2, random_state=42)
+
+# -------------------------------
+# Train the Logistic Regression Model
+# -------------------------------
+
+model = LogisticRegressionModel(learning_rate=0.01, num_iterations=1000)
+model.fit(X_train, y_train)
+
+# -------------------------------
+# Evaluate the Model
+# -------------------------------
+
+predictions = model.predict(X_test)
+
+# Show how many of each class were predicted
+unique_preds, counts = np.unique(predictions, return_counts=True)
+print("\nPrediction class distribution:")
+for cls, cnt in zip(unique_preds, counts):
+    print(f"Class {cls}: {cnt} predictions")
+
+# Print accuracy and classification report
+print("\nAccuracy:", accuracy_score(y_test, predictions))
+print("\nClassification Report:\n", classification_report(y_test, predictions, zero_division=0))
